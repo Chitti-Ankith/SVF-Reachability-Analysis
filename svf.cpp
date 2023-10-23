@@ -64,7 +64,7 @@ bool findAllPathsDFS(const ICFG& icfg, Node* current, Node* sink, std::unordered
         // Process successors of the current node in a context-sensitive manner
         for (Node* successor : icfg.getSuccessors(current)) {
             // Check contextual information using SVF APIs
-            // Add your context-sensitive conditions here
+            // Add context-sensitive conditions here
 
             // If the successor has not been visited, recursively call DFS
             if (visited.find(successor) == visited.end()) {
@@ -77,13 +77,13 @@ bool findAllPathsDFS(const ICFG& icfg, Node* current, Node* sink, std::unordered
                 if (it != currentPath.end()) {
                     std::cout << "Cycle[";
                     for (; it != currentPath.end(); ++it) {
-                        std::cout << (*it)->getName(); // Adjust this based on your actual Node representation
+                        std::cout << (*it)->getName(); // Adjust this based on actual Node representation
                         if (std::next(it) != currentPath.end()) {
                             std::cout << " --> ";
                         }
                     }
                     std::cout << "]";
-                    return true; // Stop further traversal for this path
+                    return true; // Stop further traversal for this path. This might need to be updated.
                 }
             }
         }
@@ -137,7 +137,7 @@ int main(int argc, char ** argv) {
     ICFG* icfg = pag->getICFG();
 
 
-    // Assuming you have identified source and sink nodes using SVF
+    // Assuming we have identified source and sink nodes using SVF. Need more details on how to do this.
     Node* source = /* identified source node */;
     Node* sink = /* identified sink node */;
 
