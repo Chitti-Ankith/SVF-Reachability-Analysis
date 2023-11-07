@@ -1,4 +1,8 @@
 #include "SVF-LLVM/LLVMUtil.h"
+#include "Graphs/SVFG.h"
+#include "SVF-LLVM/SVFIRBuilder.h"
+#include "SVFIR/SVFModule.h"
+#include "Util/Options.h"
 
 #include <iostream>
 #include <vector>
@@ -14,8 +18,8 @@ static llvm::cl::opt<std::string> InputFilename(cl::Positional,
         llvm::cl::desc("<input bitcode>"), llvm::cl::init("-"));
 
 
-// Assuming Node data structures from SVF
-using Node = /* SVF Node type */;
+// llvm-dis test1.bc
+// opt -dot-cfg test_cases/test1.ll 
 
 /*
  * An example to query/collect all successor nodes from a ICFGNode (iNode) along control-flow graph (ICFG)
@@ -47,6 +51,20 @@ void traverseOnICFG(ICFG* icfg, const Instruction* inst)
     }
 }
 
+
+for (auto it = iNode->OutEdgeBegin(), eit =
+                iNode->OutEdgeEnd(); it != eit; ++it) {
+        ICFGEdge* edge = *it;
+        auto name = edge->getDstNode()->getFun()->getName();
+        cout << name << endl;
+        // if (visited.find(succNode) == visited.end())
+        // {
+        //     visited.insert(succNode);
+        //     worklist.push(succNode);
+        // }
+}
+
+
 // Function to perform context-sensitive DFS reachability analysis and detect cycles
 bool findAllPathsDFS(const ICFG& icfg, Node* current, Node* sink, std::unordered_set<Node*>& visited, std::vector<Node*>& currentPath, std::vector<std::vector<Node*>>& allPaths) {
     // Mark the current node as visited
@@ -64,7 +82,7 @@ bool findAllPathsDFS(const ICFG& icfg, Node* current, Node* sink, std::unordered
         // Process successors of the current node in a context-sensitive manner
         for (Node* successor : icfg.getSuccessors(current)) {
             // Check contextual information using SVF APIs
-            // Add context-sensitive conditions here
+            // Add your context-sensitive conditions here
 
             // If the successor has not been visited, recursively call DFS
             if (visited.find(successor) == visited.end()) {
@@ -77,13 +95,13 @@ bool findAllPathsDFS(const ICFG& icfg, Node* current, Node* sink, std::unordered
                 if (it != currentPath.end()) {
                     std::cout << "Cycle[";
                     for (; it != currentPath.end(); ++it) {
-                        std::cout << (*it)->getName(); // Adjust this based on actual Node representation
+                        std::cout << (*it)->getName(); // Adjust this based on your actual Node representation
                         if (std::next(it) != currentPath.end()) {
                             std::cout << " --> ";
                         }
                     }
                     std::cout << "]";
-                    return true; // Stop further traversal for this path. This might need to be updated.
+                    return true; // Stop further traversal for this path
                 }
             }
         }
@@ -136,10 +154,8 @@ int main(int argc, char ** argv) {
     // ICFG
     ICFG* icfg = pag->getICFG();
 
-
-    // Assuming we have identified source and sink nodes using SVF. Need more details on how to do this.
-    Node* source = /* identified source node */;
-    Node* sink = /* identified sink node */;
+    auto src = svfModule->getSVFFunction("src");
+    auto sink = svfModule->getSVFFunction("sink");
 
     // Find all paths from source to sink and detect cycles
     findAllPathsContextSensitiveDFS(icfg, source, sink);
