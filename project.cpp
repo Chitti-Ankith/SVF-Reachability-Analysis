@@ -62,7 +62,7 @@ int main(int argc, char ** argv) {
     cout << (sink ? "Yes" : "No") << endl;
 
 
-    auto iNode = icfg->getICFGNode(src);
+    auto iNode = icfg->getFunEntryICFGNode(src);
     // FIFOWorkList<const ICFGNode*> worklist;
     // Set<const ICFGNode*> visited;
     // worklist.push(iNode);
