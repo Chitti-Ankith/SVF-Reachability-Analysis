@@ -28,7 +28,7 @@ void traverseOnICFG(ICFG* icfg, const Instruction* inst)
 {
     SVFInstruction* svfinst = LLVMModuleSet::getLLVMModuleSet()->getSVFInstruction(inst);
 
-    ICFGNode* iNode = icfg->getFunEntryICFGNode(svfinst);
+    ICFGNode* iNode = icfg->getICFGNode(svfinst);
     FIFOWorkList<const ICFGNode*> worklist;
     Set<const ICFGNode*> visited;
     worklist.push(iNode);
