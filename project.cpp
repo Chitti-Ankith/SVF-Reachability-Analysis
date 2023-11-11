@@ -38,6 +38,40 @@ using namespace SVF;
 static llvm::cl::opt<std::string> InputFilename(cl::Positional,
         llvm::cl::desc("<input bitcode>"), llvm::cl::init("-"));
 
+bool reachable = false;
+vector<vector<string>> paths;
+
+void dfs(const ICFGNode* node, Set<NodeID>& visited, vector<string> cur_path, const string& prev_func) {
+    // cout << "DFS on " << node->getId() << ", Size = " << node->getOutEdges().size() << endl;
+    for (auto it = node->OutEdgeBegin(), eit = node->OutEdgeEnd(); it != eit; ++it) {
+        ICFGEdge* edge = *it;
+        auto dst_node = edge->getDstNode();
+        auto dst_node_id = dst_node->getId();
+        if (visited.count(dst_node_id)) {
+            continue;
+        }
+        // cout << dst_node_id << endl;
+        auto name = dst_node->getFun()->getName();
+        // cout << name << endl;
+        if (name == "sink") {
+            reachable = true;
+            cur_path.push_back(name);
+            paths.push_back(cur_path);
+            return; // check this
+        }
+
+        visited.insert(dst_node_id);
+
+        if (name != prev_func) {
+            cur_path.push_back(name);
+        }
+        dfs(dst_node, visited, cur_path, name);
+        if (name != prev_func) {
+            cur_path.pop_back();
+        }
+    }
+}
+
 int main(int argc, char ** argv) {
 
     int arg_num = 0;
@@ -58,40 +92,70 @@ int main(int argc, char ** argv) {
 
     auto src = svfModule->getSVFFunction("src");
     auto sink = svfModule->getSVFFunction("sink");
-    cout << (src ? "Yes" : "No") << endl;
-    cout << (sink ? "Yes" : "No") << endl;
+    // cout << (src ? "Yes" : "No") << endl;
+    // cout << (sink ? "Yes" : "No") << endl;
 
+    if (!src || !sink) {
+        cout << "Unreachable" << endl;
+        SVFIR::releaseSVFIR();
+
+        SVF::LLVMModuleSet::releaseLLVMModuleSet();
+        llvm::llvm_shutdown();
+        return 0;
+    }
 
     auto iNode = icfg->getFunEntryICFGNode(src);
     // FIFOWorkList<const ICFGNode*> worklist;
-    // Set<const ICFGNode*> visited;
     // worklist.push(iNode);
+    Set<NodeID> visited;
+    visited.insert(iNode->getId());
+    vector<string> cur_path;
+    cur_path.push_back("src");
+    dfs(iNode, visited, cur_path, "src");
+    
 
-    /// Traverse along VFG
-    // while (!worklist.empty())
-    // {
-        // const ICFGNode* iNode = worklist.pop();
-    for (auto it = iNode->OutEdgeBegin(), eit =
-                iNode->OutEdgeEnd(); it != eit; ++it)
-    {
-        ICFGEdge* edge = *it;
-        auto name = edge->getDstNode()->getFun()->getName();
-        cout << name << endl;
-        // if (visited.find(succNode) == visited.end())
-        // {
-        //     visited.insert(succNode);
-        //     worklist.push(succNode);
-        // }
-    }
+    // // Traverse along ICFG using BFS
+    // while (!worklist.empty()) {
+    //     const auto iNode = worklist.pop();
+    //     for (auto it = iNode->OutEdgeBegin(), eit = iNode->OutEdgeEnd(); it != eit; ++it) {
+    //         ICFGEdge* edge = *it;
+    //         auto dst_node = edge->getDstNode();
+    //         auto dst_node_id = dst_node->getId();
+    //         if (visited.count(dst_node_id)) {
+    //             continue;
+    //         }
+    //         // cout << dst_node_id << endl;
+    //         auto name = dst_node->getFun()->getName();
+    //         // cout << name << endl;
+    //         if (name == "sink") {
+    //             reachable = true;
+    //         }
+
+    //         visited.insert(dst_node_id);
+    //         worklist.push(dst_node);
+    //     }
     // }
 
+    cout << (reachable ? "Reachable" : "Unreachable") << endl;
+
+    if (paths.size()) {
+        for (const auto& path : paths) {
+            string result;
+            for (int i = 0; i < path.size(); ++i) {
+                result += path[i];
+
+                if (i != path.size() - 1) {
+                    result += "-->";
+                }
+            }
+            cout << result << endl;
+        }
+    }
 
     SVFIR::releaseSVFIR();
 
     SVF::LLVMModuleSet::releaseLLVMModuleSet();
     llvm::llvm_shutdown();
-
-    cout << "Chitti" << endl;
 
     return 0;
 }
