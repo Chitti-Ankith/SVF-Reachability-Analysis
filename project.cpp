@@ -1,4 +1,3 @@
-
 //===- SVF-Project -------------------------------------//
 //
 //                     SVF: Static Value-Flow Analysis
@@ -39,37 +38,81 @@ static llvm::cl::opt<std::string> InputFilename(cl::Positional,
         llvm::cl::desc("<input bitcode>"), llvm::cl::init("-"));
 
 bool reachable = false;
-vector<vector<string>> paths;
+vector<vector<int>> paths;
+vector<vector<int>> cycles;
 
-void dfs(const ICFGNode* node, Set<NodeID>& visited, vector<string> cur_path, const string& prev_func) {
-    // cout << "DFS on " << node->getId() << ", Size = " << node->getOutEdges().size() << endl;
+void dfs(const ICFGNode* node, int parent_id, vector<int>& visited, Map<NodeID, int>& parent, vector<int>& cur_path, const string& cur_func) {
+
+    cout << "DFS on " << node->getId() << ":" << cur_func << ", Parent " << parent_id << ", Current Nodes size = " << visited.size() << ", Output edges size = " << node->getOutEdges().size() << endl;
+
+    if (cur_func == "sink") {
+        reachable = true;
+        // cur_path.push_back(name);
+        paths.push_back(cur_path);
+        return;
+    }
+
+    // if (visited[node->getId()] == 2) {
+    //     return;
+    // }
+
+    // if (visited[node->getId()] == 1) {
+    //     vector<int> v;
+    //     int cur = parent_id;
+    //     v.push_back(cur);
+
+    //     while (cur != node->getId()) {
+    //         cur = parent[cur];
+    //         v.push_back(cur);
+    //     }
+    //     reverse(v.begin(), v.end());
+    //     cycles.push_back(move(v));
+    //     return;
+    // }
+
+    // parent[node->getId()] = parent_id;
+
+    // visited[node->getId()] = 1;
+    // visited.insert(node->getId());
+
     for (auto it = node->OutEdgeBegin(), eit = node->OutEdgeEnd(); it != eit; ++it) {
         ICFGEdge* edge = *it;
         auto dst_node = edge->getDstNode();
         auto dst_node_id = dst_node->getId();
-        if (visited.count(dst_node_id)) {
+        auto name = dst_node->getFun()->getName();
+
+        cout << "Dest : " << dst_node_id << ":" << name << ", Parent : " << node->getId() << endl;
+        
+        if (find(visited.begin(), visited.end(), dst_node_id) != visited.end()) {
+            // Cycle detected.
+            auto copy = visited;
+            // reverse(copy.begin(), copy.end());
+            cycles.push_back(move(copy));
             continue;
         }
-        // cout << dst_node_id << endl;
-        auto name = dst_node->getFun()->getName();
-        // cout << name << endl;
-        if (name == "sink") {
-            reachable = true;
-            cur_path.push_back(name);
-            paths.push_back(cur_path);
-            return; // check this
-        }
 
-        visited.insert(dst_node_id);
+        // if (dst_node_id == parent[node->getId()]) {
+        //     continue;
+        // }
 
-        if (name != prev_func) {
-            cur_path.push_back(name);
-        }
-        dfs(dst_node, visited, cur_path, name);
-        if (name != prev_func) {
-            cur_path.pop_back();
-        }
+        // if (visited.count(dst_node_id)) {
+        //     continue;
+        // }
+
+        // visited.insert(dst_node_id);
+
+        cur_path.push_back(dst_node_id);
+        visited.push_back(dst_node_id);
+
+        dfs(dst_node, node->getId(), visited, parent, cur_path, name);
+
+        cur_path.pop_back();
+        visited.pop_back();
+        // visited.erase(dst_node_id);
     }
+
+    // visited.erase(node->getId());
+    // visited[node->getId()] = 2;
 }
 
 int main(int argc, char ** argv) {
@@ -107,11 +150,15 @@ int main(int argc, char ** argv) {
     auto iNode = icfg->getFunEntryICFGNode(src);
     // FIFOWorkList<const ICFGNode*> worklist;
     // worklist.push(iNode);
-    Set<NodeID> visited;
-    visited.insert(iNode->getId());
-    vector<string> cur_path;
-    cur_path.push_back("src");
-    dfs(iNode, visited, cur_path, "src");
+    // Map<NodeID, int> visited;
+    vector<int> visited;
+    Map<NodeID, int> parent;
+    parent[iNode->getId()] = 0;
+    // visited.insert(iNode->getId());
+    visited.push_back(iNode->getId());
+    vector<int> cur_path;
+    cur_path.push_back(iNode->getId());
+    dfs(iNode, iNode->getId(), visited, parent, cur_path, "src");
     
 
     // // Traverse along ICFG using BFS
@@ -142,7 +189,21 @@ int main(int argc, char ** argv) {
         for (const auto& path : paths) {
             string result;
             for (int i = 0; i < path.size(); ++i) {
-                result += path[i];
+                result += to_string(path[i]);
+
+                if (i != path.size() - 1) {
+                    result += "-->";
+                }
+            }
+            cout << result << endl;
+        }
+    }
+
+    if (cycles.size()) {
+        for (const auto& path : cycles) {
+            string result;
+            for (int i = 0; i < path.size(); ++i) {
+                result += to_string(path[i]);
 
                 if (i != path.size() - 1) {
                     result += "-->";
