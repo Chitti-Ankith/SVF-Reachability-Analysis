@@ -1,3 +1,4 @@
+
 //===- SVF-Project -------------------------------------//
 //
 //                     SVF: Static Value-Flow Analysis
@@ -43,63 +44,24 @@ vector<vector<int>> cycles;
 
 void dfs(const ICFGNode* node, int parent_id, vector<int>& visited, Map<NodeID, int>& parent, vector<int>& cur_path, const string& cur_func) {
 
-    cout << "DFS on " << node->getId() << ":" << cur_func << ", Parent " << parent_id << ", Current Nodes size = " << visited.size() << ", Output edges size = " << node->getOutEdges().size() << endl;
-
     if (cur_func == "sink") {
         reachable = true;
-        // cur_path.push_back(name);
         paths.push_back(cur_path);
         return;
     }
-
-    // if (visited[node->getId()] == 2) {
-    //     return;
-    // }
-
-    // if (visited[node->getId()] == 1) {
-    //     vector<int> v;
-    //     int cur = parent_id;
-    //     v.push_back(cur);
-
-    //     while (cur != node->getId()) {
-    //         cur = parent[cur];
-    //         v.push_back(cur);
-    //     }
-    //     reverse(v.begin(), v.end());
-    //     cycles.push_back(move(v));
-    //     return;
-    // }
-
-    // parent[node->getId()] = parent_id;
-
-    // visited[node->getId()] = 1;
-    // visited.insert(node->getId());
 
     for (auto it = node->OutEdgeBegin(), eit = node->OutEdgeEnd(); it != eit; ++it) {
         ICFGEdge* edge = *it;
         auto dst_node = edge->getDstNode();
         auto dst_node_id = dst_node->getId();
         auto name = dst_node->getFun()->getName();
-
-        cout << "Dest : " << dst_node_id << ":" << name << ", Parent : " << node->getId() << endl;
         
         if (find(visited.begin(), visited.end(), dst_node_id) != visited.end()) {
             // Cycle detected.
             auto copy = visited;
-            // reverse(copy.begin(), copy.end());
             cycles.push_back(move(copy));
             continue;
         }
-
-        // if (dst_node_id == parent[node->getId()]) {
-        //     continue;
-        // }
-
-        // if (visited.count(dst_node_id)) {
-        //     continue;
-        // }
-
-        // visited.insert(dst_node_id);
 
         cur_path.push_back(dst_node_id);
         visited.push_back(dst_node_id);
@@ -108,12 +70,34 @@ void dfs(const ICFGNode* node, int parent_id, vector<int>& visited, Map<NodeID, 
 
         cur_path.pop_back();
         visited.pop_back();
-        // visited.erase(dst_node_id);
     }
-
-    // visited.erase(node->getId());
-    // visited[node->getId()] = 2;
 }
+
+void print_cyclic_path(vector<int>& path) {
+    string result;
+    bool cycle_init = false;
+    for (int i = 0; i < path.size(); ++i) {
+        if (path[i] == -1) {
+            if (cycle_init) {
+               result += "]";
+               cycle_init = false;
+            } else {
+                result += ((i == 0) ? "Cycle[" : "-->Cycle[");
+                result += to_string(path[++i]);
+                cycle_init = true;
+            }
+            continue;
+        } else {
+            if (i != 0) {
+                result += "-->";
+            }
+        
+            result += to_string(path[i]);
+        }
+    }
+    cout << result << endl;
+}
+
 
 int main(int argc, char ** argv) {
 
@@ -135,8 +119,6 @@ int main(int argc, char ** argv) {
 
     auto src = svfModule->getSVFFunction("src");
     auto sink = svfModule->getSVFFunction("sink");
-    // cout << (src ? "Yes" : "No") << endl;
-    // cout << (sink ? "Yes" : "No") << endl;
 
     if (!src || !sink) {
         cout << "Unreachable" << endl;
@@ -148,44 +130,19 @@ int main(int argc, char ** argv) {
     }
 
     auto iNode = icfg->getFunEntryICFGNode(src);
-    // FIFOWorkList<const ICFGNode*> worklist;
-    // worklist.push(iNode);
-    // Map<NodeID, int> visited;
     vector<int> visited;
     Map<NodeID, int> parent;
     parent[iNode->getId()] = 0;
-    // visited.insert(iNode->getId());
     visited.push_back(iNode->getId());
     vector<int> cur_path;
     cur_path.push_back(iNode->getId());
+    // Identify all paths.
     dfs(iNode, iNode->getId(), visited, parent, cur_path, "src");
-    
-
-    // // Traverse along ICFG using BFS
-    // while (!worklist.empty()) {
-    //     const auto iNode = worklist.pop();
-    //     for (auto it = iNode->OutEdgeBegin(), eit = iNode->OutEdgeEnd(); it != eit; ++it) {
-    //         ICFGEdge* edge = *it;
-    //         auto dst_node = edge->getDstNode();
-    //         auto dst_node_id = dst_node->getId();
-    //         if (visited.count(dst_node_id)) {
-    //             continue;
-    //         }
-    //         // cout << dst_node_id << endl;
-    //         auto name = dst_node->getFun()->getName();
-    //         // cout << name << endl;
-    //         if (name == "sink") {
-    //             reachable = true;
-    //         }
-
-    //         visited.insert(dst_node_id);
-    //         worklist.push(dst_node);
-    //     }
-    // }
 
     cout << (reachable ? "Reachable" : "Unreachable") << endl;
 
     if (paths.size()) {
+        // First print all paths without including cycles.     
         for (const auto& path : paths) {
             string result;
             for (int i = 0; i < path.size(); ++i) {
@@ -197,19 +154,47 @@ int main(int argc, char ** argv) {
             }
             cout << result << endl;
         }
-    }
 
-    if (cycles.size()) {
-        for (const auto& path : cycles) {
-            string result;
-            for (int i = 0; i < path.size(); ++i) {
-                result += to_string(path[i]);
+        // Combine cycles into the paths.
+        if (cycles.size()) {
+            for (const auto& cycle : cycles) {
+                for (const auto& path : paths) {
+                    for (int i = 0; i < path.size(); ++i) {
+                        deque<int> temp_cycle(cycle.begin(), cycle.end()); // Make a copy of the cycle to modify.
+                        vector<int> temp_path = path;
 
-                if (i != path.size() - 1) {
-                    result += "-->";
+                        auto it = find(cycle.begin(), cycle.end(), path[i]);
+                        if (it == cycle.end()) {
+                            continue;
+                        }
+
+                        // Get the index of the element.
+                        int index = it - cycle.begin();
+
+                        // Remove all elements from the temp_cycle up until the index and push them to the back.
+                        for (int j = 0; j < index; ++j) {
+                            temp_cycle.push_back(temp_cycle.front());
+                            temp_cycle.pop_front();
+                        }
+
+                        temp_cycle.push_back(temp_cycle.front());
+                        // Add markers to signify start and end of cycle.
+                        temp_cycle.push_front(-1);
+                        temp_cycle.push_back(-1);
+
+                        // Merge cycle into the path.
+                        auto path_it = find(temp_path.begin(), temp_path.end(), path[i]);
+                        if (path_it == temp_path.end()) {
+                            continue;
+                        }
+                        auto path_index = path_it - temp_path.begin();
+                        temp_path.erase(path_it);
+                        temp_path.insert(path_index + temp_path.begin(), temp_cycle.begin(), temp_cycle.end());
+
+                        print_cyclic_path(temp_path);
+                    }
                 }
             }
-            cout << result << endl;
         }
     }
 
